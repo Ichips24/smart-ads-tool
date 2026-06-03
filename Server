@@ -1,0 +1,61 @@
+const express = require('express');
+const cors = require('cors');
+const axios = require('axios');
+require('dotenv').config();
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const FB_API_VERSION = 'v19.0'; // Update to Meta's current API version
+const ACCESS_TOKEN = process.env.FB_ACCESS_TOKEN; 
+
+// Endpoint: Suggest targeting based on content
+app.post('/api/analyze-content', async (req, res) => {
+    const { content } = req.body;
+    
+    // In a real app, this routes to an NLP model or OpenAI.
+    // Here we mock the AI logic extracting keywords:
+    const suggestedInterests = [
+        { id: '6003139266461', name: 'Digital marketing' },
+        { id: '6003023062325', name: 'Social media' }
+    ];
+
+    res.json({ targetAudience: suggestedInterests });
+});
+
+// Endpoint: Launch Smart Ad Set
+app.post('/api/launch-campaign', async (req, res) => {
+    const { adAccountId, campaignId, interests } = req.body;
+    const url = `https://graph.facebook.com/${FB_API_VERSION}/act_${adAccountId}/adsets`;
+
+    // Advanced "AND" targeting logic 
+    const flexibleSpec = interests.map(interest => ({
+        interests: [{ id: interest.id, name: interest.name }]
+    }));
+
+    const payload = {
+        name: `Smart Target AI - ${new Date().toISOString()}`,
+        campaign_id: campaignId,
+        daily_budget: 1000, // $10.00
+        billing_event: 'IMPRESSIONS',
+        optimization_goal: 'REACH',
+        targeting: {
+            geo_locations: { countries: ['US', 'GB'] },
+            flexible_spec: flexibleSpec // The secret to laser-focused targeting
+        },
+        status: 'PAUSED', // Start paused for safety
+        access_token: ACCESS_TOKEN
+    };
+
+    try {
+        const response = await axios.post(url, payload);
+        res.json({ success: true, adSetId: response.data.id });
+    } catch (error) {
+        res.status(500).json({ error: error.response ? error.response.data : 'API Error' });
+    }
+});
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => console.log(`Smart Ads Engine running on port ${PORT}`));
+
